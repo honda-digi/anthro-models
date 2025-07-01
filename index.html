@@ -43,14 +43,42 @@
             document.getElementById('results').innerHTML = '';
 
             try {
-                // 無料のCORSプロキシを使用
-                const response = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://api.anthropic.com/v1/models')}`, {
-                    method: 'GET',
-                    headers: {
-                        'x-api-key': apiKey,
-                        'anthropic-version': '2023-06-01'
+                // 複数のCORSプロキシを順番に試す
+                const proxies = [
+                    `https://cors-anywhere.herokuapp.com/https://api.anthropic.com/v1/models`,
+                    `https://api.allorigins.win/raw?url=${encodeURIComponent('https://api.anthropic.com/v1/models')}`,
+                    `https://corsproxy.io/?https://api.anthropic.com/v1/models`
+                ];
+
+                let response = null;
+                let lastError = null;
+
+                for (let proxyUrl of proxies) {
+                    try {
+                        response = await fetch(proxyUrl, {
+                            method: 'GET',
+                            headers: {
+                                'x-api-key': apiKey,
+                                'anthropic-version': '2023-06-01',
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            break; // 成功したらループを抜ける
+                        } else {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                    } catch (error) {
+                        lastError = error;
+                        console.log(`プロキシ ${proxyUrl} に失敗:`, error);
+                        continue; // 次のプロキシを試す
                     }
-                });
+                }
+
+                if (!response || !response.ok) {
+                    throw lastError || new Error('すべてのプロキシが失敗しました');
+                }
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
